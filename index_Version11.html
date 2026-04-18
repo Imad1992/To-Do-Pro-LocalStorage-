@@ -1,0 +1,911 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>To‑Do List (LocalStorage)</title>
+  <style>
+    :root{
+      --bg0:#070a13; --bg1:#0b1220;
+      --card: rgba(18, 27, 47, .72);
+      --border: rgba(255,255,255,.12);
+      --text:#e8eefc; --muted: rgba(232,238,252,.72);
+      --accent:#6aa6ff; --accent2:#7cf7c2; --danger:#ff6a6a; --warn:#ffd36a;
+      --shadow: 0 22px 70px rgba(0,0,0,.42);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 800px at 15% 10%, rgba(106,166,255,.20), transparent 55%),
+        radial-gradient(1000px 700px at 85% 18%, rgba(124,247,194,.14), transparent 60%),
+        radial-gradient(900px 700px at 55% 90%, rgba(255,106,106,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      min-height:100vh;
+    }
+    .wrap{ max-width: 1100px; margin: 26px auto; padding: 0 16px 40px; }
+    header{ display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:14px; }
+    h1{ margin:0; font-size: 30px; letter-spacing:.2px; }
+    .subtitle{ margin-top:6px; color:var(--muted); font-size:13px; line-height:1.35; max-width: 760px; }
+
+    .panel{
+      margin-top: 14px;
+      background: rgba(18,27,47,.55);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    input[type="text"], input[type="date"], textarea, select, button{
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(10, 16, 30, .55);
+      color: var(--text);
+      padding: 11px 12px;
+      font-size: 14px;
+      outline:none;
+    }
+    input[type="text"]{ flex: 1 1 280px; }
+    textarea{ width:100%; resize: vertical; min-height: 86px; }
+    button{ cursor:pointer; }
+    button.primary{
+      border:none;
+      background: linear-gradient(135deg, rgba(106,166,255,.98), rgba(124,247,194,.74));
+      color:#061022;
+      font-weight: 900;
+      padding: 11px 14px;
+    }
+    button.ghost{ background: rgba(255,255,255,.05); }
+    button.danger{ background: rgba(255,106,106,.10); border-color: rgba(255,106,106,.25); }
+    button.small{ padding: 8px 10px; border-radius: 12px; font-size: 13px; }
+
+    .stats{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .chip{
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+    }
+
+    .grid{
+      margin-top: 14px;
+      display:grid;
+      grid-template-columns: 1fr minmax(280px, 380px);
+      gap: 14px;
+      align-items:start;
+    }
+    @media (max-width: 760px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+    .rightCard{ position: sticky; top: 14px; }
+
+    .list{ display:flex; flex-direction:column; gap:10px; margin-top: 12px; }
+    .item{
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(18,27,47,.80), rgba(18,27,47,.56));
+      box-shadow: 0 14px 38px rgba(0,0,0,.26);
+      padding: 12px 12px;
+      display:flex; gap:12px; align-items:flex-start;
+      position:relative;
+      overflow:hidden;
+    }
+    .item::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background:
+        radial-gradient(520px 260px at 10% 10%, rgba(106,166,255,.14), transparent 55%),
+        radial-gradient(420px 260px at 90% 15%, rgba(124,247,194,.10), transparent 58%);
+      opacity:.9;
+      pointer-events:none;
+    }
+    .item > *{ position:relative; }
+    .item.dragging{ opacity:.75; outline: 2px dashed rgba(106,166,255,.55); }
+
+    .check{
+      width: 18px; height: 18px;
+      margin-top: 3px;
+      cursor:pointer;
+      accent-color: var(--accent2);
+      flex: 0 0 auto;
+    }
+    .content{ flex: 1 1 auto; min-width: 0; }
+    .title{
+      font-weight: 950;
+      line-height: 1.25;
+      word-break: break-word;
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    }
+    .title.done{ text-decoration: line-through; opacity:.70; }
+    .desc{
+      margin-top: 7px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .meta{
+      margin-top: 8px;
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .badge{
+      font-size: 11px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+    }
+    .badge.high{ border-color: rgba(255,106,106,.45); color: rgba(255,106,106,.95); }
+    .badge.normal{ border-color: rgba(106,166,255,.35); color: rgba(106,166,255,.95); }
+    .badge.low{ border-color: rgba(124,247,194,.28); color: rgba(124,247,194,.95); }
+    .badge.tag{ border-color: rgba(255,255,255,.18); }
+    .badge.today{ border-color: rgba(255,211,106,.40); color: rgba(255,211,106,.95); }
+    .badge.overdue{ border-color: rgba(255,106,106,.55); color: rgba(255,106,106,.95); }
+
+    .actions{ display:flex; gap:8px; align-items:center; flex: 0 0 auto; }
+    .actions button{ border-radius: 12px; }
+
+    .grip{
+      user-select:none;
+      cursor: grab;
+      padding: 7px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .empty{
+      color: var(--muted);
+      font-size: 13px;
+      text-align:center;
+      padding: 18px 10px;
+      border-radius: 18px;
+      border: 1px dashed rgba(255,255,255,.16);
+      background: rgba(255,255,255,.04);
+      margin-top: 12px;
+    }
+
+    .rightCard h2{ margin:0 0 10px; font-size: 16px; }
+    .muted{ color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+    /* Modal */
+    .modalBack{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.60);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 50;
+    }
+    .modal{
+      width:min(760px, 100%);
+      background: rgba(18,27,47,.92);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      backdrop-filter: blur(12px);
+    }
+    .modalHeader{
+      display:flex; justify-content:space-between; gap:10px; align-items:center;
+      margin-bottom: 10px;
+    }
+    .modalHeader h2{ margin:0; font-size: 18px; }
+
+    /* Toast */
+    .toast{
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(18,27,47,.95);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--text);
+      box-shadow: 0 18px 60px rgba(0,0,0,.35);
+      display:none;
+      z-index: 60;
+      font-size: 13px;
+      max-width: min(760px, 94vw);
+      text-align:center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>To‑Do Pro</h1>
+        <div class="subtitle">
+          A to-do list app with <b>LocalStorage</b>, <b>tags</b>, <b>due dates</b>, <b>notes</b>, <b>search</b>, <b>sorting</b>,
+          <b>bulk actions</b>, <b>export/import</b>, and a sticky right-side preview panel.
+        </div>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="row">
+        <input id="taskInput" type="text" placeholder="New task… (Enter to add)" />
+        <input id="dueInput" type="date" />
+        <select id="priority">
+          <option value="normal" selected>Priority: Normal</option>
+          <option value="high">Priority: High</option>
+          <option value="low">Priority: Low</option>
+        </select>
+        <input id="tagsInput" type="text" placeholder="Tags (comma separated) e.g. work, gym" />
+        <button id="addBtn" class="primary">Add</button>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <input id="searchInput" type="text" placeholder="Search title, notes, tags…" />
+        <select id="filter">
+          <option value="all" selected>All</option>
+          <option value="active">Active</option>
+          <option value="done">Completed</option>
+          <option value="today">Due Today</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <select id="sort">
+          <option value="manual" selected>Sort: Manual</option>
+          <option value="due_asc">Sort: Due date</option>
+          <option value="priority_desc">Sort: Priority</option>
+          <option value="created_desc">Sort: Newest</option>
+          <option value="created_asc">Sort: Oldest</option>
+        </select>
+        <button id="clearDoneBtn" class="ghost">Clear completed</button>
+        <button id="exportBtn" class="ghost">Export</button>
+        <button id="importBtn" class="ghost">Import</button>
+        <button id="resetBtn" class="danger">Reset</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none;" />
+      </div>
+
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;">
+          <div style="font-weight:950">Tasks</div>
+          <div class="row">
+            <button class="small ghost" id="selectAllBtn">Select visible</button>
+            <button class="small ghost" id="markDoneBtn">Mark done</button>
+            <button class="small danger" id="deleteSelectedBtn">Delete</button>
+          </div>
+        </div>
+
+        <div id="list" class="list"></div>
+        <div id="empty" class="empty" style="display:none;">No tasks to show.</div>
+
+        <div class="muted" style="margin-top:12px;">
+          Storage key: <code>todo_pro_v1</code>. Use <code>/</code> to focus search, <code>Esc</code> closes modal.
+        </div>
+      </div>
+
+      <div class="panel rightCard">
+        <h2>Preview (right panel)</h2>
+        <div class="muted">Click a task to preview it here. This stays on the right on wide screens.</div>
+
+        <div style="margin-top:12px;">
+          <div class="badge" id="pvStatus">No task selected</div>
+          <div style="margin-top:10px; font-weight:950; font-size:16px;" id="pvTitle">—</div>
+          <div class="muted" style="margin-top:6px;" id="pvMeta">—</div>
+          <div class="desc" style="margin-top:10px;" id="pvNotes">—</div>
+        </div>
+
+        <div style="margin-top:14px;">
+          <h2>Tag shortcuts</h2>
+          <div id="tagChips" class="stats" style="margin-top:8px;"></div>
+          <div class="muted">Click a tag to filter. Click “Clear tag” in stats to remove filter.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modalBack" id="modalBack">
+    <div class="modal">
+      <div class="modalHeader">
+        <h2 id="modalTitle">Edit task</h2>
+        <button class="small ghost" id="modalClose">Close</button>
+      </div>
+
+      <div class="row">
+        <input id="modalTaskTitle" type="text" placeholder="Task title" style="flex:1 1 auto;" />
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <input id="modalDue" type="date" />
+        <select id="modalPriority">
+          <option value="normal">Priority: Normal</option>
+          <option value="high">Priority: High</option>
+          <option value="low">Priority: Low</option>
+        </select>
+        <input id="modalTags" type="text" placeholder="Tags (comma separated)" style="flex:1 1 240px;" />
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <textarea id="modalNotes" placeholder="Notes…"></textarea>
+      </div>
+
+      <div class="row" style="justify-content:flex-end;margin-top:10px;">
+        <button class="ghost" id="modalCancel">Cancel</button>
+        <button class="primary" id="modalSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "todo_pro_v1";
+
+    const $ = (id) => document.getElementById(id);
+
+    // Inputs
+    const taskInput = $("taskInput");
+    const dueInput = $("dueInput");
+    const prioritySel = $("priority");
+    const tagsInput = $("tagsInput");
+    const addBtn = $("addBtn");
+
+    const searchInput = $("searchInput");
+    const filterSel = $("filter");
+    const sortSel = $("sort");
+
+    const clearDoneBtn = $("clearDoneBtn");
+    const exportBtn = $("exportBtn");
+    const importBtn = $("importBtn");
+    const importFile = $("importFile");
+    const resetBtn = $("resetBtn");
+
+    const listEl = $("list");
+    const emptyEl = $("empty");
+    const statsEl = $("stats");
+    const tagChipsEl = $("tagChips");
+
+    const selectAllBtn = $("selectAllBtn");
+    const markDoneBtn = $("markDoneBtn");
+    const deleteSelectedBtn = $("deleteSelectedBtn");
+
+    // Preview panel
+    const pvStatus = $("pvStatus");
+    const pvTitle = $("pvTitle");
+    const pvMeta = $("pvMeta");
+    const pvNotes = $("pvNotes");
+
+    // Modal
+    const modalBack = $("modalBack");
+    const modalClose = $("modalClose");
+    const modalCancel = $("modalCancel");
+    const modalSave = $("modalSave");
+
+    const modalTaskTitle = $("modalTaskTitle");
+    const modalDue = $("modalDue");
+    const modalPriority = $("modalPriority");
+    const modalTags = $("modalTags");
+    const modalNotes = $("modalNotes");
+
+    // Toast
+    const toast = $("toast");
+
+    // Model:
+    // { id, title, done, priority, dueDate, tags:[string], notes, createdAt, selected }
+    let todos = loadTodos();
+    let dragId = null;
+    let activeTag = null;
+    let editingId = null;
+    let previewId = null;
+
+    function rid() {
+      return crypto?.randomUUID?.() || ("id_" + Math.random().toString(16).slice(2));
+    }
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function todayISO() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    function fmtDateTime(ts) {
+      try { return new Date(ts).toLocaleString(undefined, { year:"numeric", month:"short", day:"2-digit", hour:"2-digit", minute:"2-digit" }); }
+      catch { return ""; }
+    }
+    function normTags(raw){
+      return String(raw || "")
+        .split(",")
+        .map(t => t.trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 12);
+    }
+    function toastMsg(msg){
+      toast.textContent = msg;
+      toast.style.display = "block";
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => toast.style.display = "none", 1200);
+    }
+    function priorityRank(p){ return p === "high" ? 3 : p === "normal" ? 2 : 1; }
+    function isToday(t){ return t.dueDate && t.dueDate === todayISO(); }
+    function isOverdue(t){ return t.dueDate && t.dueDate < todayISO(); }
+
+    function loadTodos(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        if (!Array.isArray(arr)) return [];
+        return arr.map(x => ({
+          id: x.id || rid(),
+          title: String(x.title ?? "Untitled"),
+          done: !!x.done,
+          priority: (x.priority === "high" || x.priority === "low" || x.priority === "normal") ? x.priority : "normal",
+          dueDate: (typeof x.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.dueDate)) ? x.dueDate : null,
+          tags: Array.isArray(x.tags) ? x.tags.map(t => String(t).toLowerCase()).filter(Boolean) : [],
+          notes: String(x.notes ?? ""),
+          createdAt: (typeof x.createdAt === "number") ? x.createdAt : Date.now(),
+          selected: !!x.selected
+        }));
+      } catch { return []; }
+    }
+    function saveTodos(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); }
+
+    function visibleTodos(){
+      let out = todos;
+
+      // filter
+      const f = filterSel.value;
+      if (f === "active") out = out.filter(t => !t.done);
+      if (f === "done") out = out.filter(t => t.done);
+      if (f === "today") out = out.filter(t => !t.done && isToday(t));
+      if (f === "overdue") out = out.filter(t => !t.done && isOverdue(t));
+
+      // tag filter
+      if (activeTag) out = out.filter(t => (t.tags || []).includes(activeTag));
+
+      // search
+      const q = searchInput.value.trim().toLowerCase();
+      if (q) {
+        out = out.filter(t =>
+          (t.title || "").toLowerCase().includes(q) ||
+          (t.notes || "").toLowerCase().includes(q) ||
+          (t.tags || []).some(tag => tag.includes(q))
+        );
+      }
+
+      // sort
+      const s = sortSel.value;
+      if (s === "created_desc") out = out.slice().sort((a,b) => b.createdAt - a.createdAt);
+      else if (s === "created_asc") out = out.slice().sort((a,b) => a.createdAt - b.createdAt);
+      else if (s === "priority_desc") out = out.slice().sort((a,b) => {
+        const d = priorityRank(b.priority) - priorityRank(a.priority);
+        if (d !== 0) return d;
+        return (a.done === b.done) ? (b.createdAt - a.createdAt) : (a.done ? 1 : -1);
+      });
+      else if (s === "due_asc") out = out.slice().sort((a,b) => {
+        const ad = a.dueDate || "9999-12-31";
+        const bd = b.dueDate || "9999-12-31";
+        if (ad !== bd) return ad.localeCompare(bd);
+        return b.createdAt - a.createdAt;
+      });
+      // manual => keep stored order
+
+      return out;
+    }
+
+    function dueBadges(t){
+      if (!t.dueDate) return "";
+      if (t.dueDate < todayISO()) return `<span class="badge overdue">Overdue</span><span class="badge">Due ${escapeHtml(t.dueDate)}</span>`;
+      if (t.dueDate === todayISO()) return `<span class="badge today">Due today</span><span class="badge">(${escapeHtml(t.dueDate)})</span>`;
+      return `<span class="badge">Due ${escapeHtml(t.dueDate)}</span>`;
+    }
+
+    function render(){
+      const items = visibleTodos();
+      listEl.innerHTML = "";
+      emptyEl.style.display = (items.length === 0) ? "block" : "none";
+
+      for (const t of items) {
+        const row = document.createElement("div");
+        row.className = "item";
+        row.draggable = (sortSel.value === "manual");
+        row.dataset.id = t.id;
+
+        const tagsHtml = (t.tags || []).slice(0, 10).map(tag => `<span class="badge tag">#${escapeHtml(tag)}</span>`).join(" ");
+        const prBadge = `<span class="badge ${escapeHtml(t.priority)}">${escapeHtml(t.priority)}</span>`;
+
+        row.innerHTML = `
+          <input class="check" type="checkbox" ${t.done ? "checked" : ""} data-toggle="${escapeHtml(t.id)}" />
+          <div class="content" data-preview="${escapeHtml(t.id)}" style="cursor:pointer">
+            <div class="title ${t.done ? "done" : ""}">
+              ${escapeHtml(t.title)} ${prBadge} ${dueBadges(t)}
+            </div>
+            ${t.notes ? `<div class="desc">${escapeHtml(t.notes)}</div>` : ""}
+            <div class="meta">
+              ${tagsHtml}
+              <span>Created: ${escapeHtml(fmtDateTime(t.createdAt))}</span>
+              ${t.selected ? `<span class="badge">Selected</span>` : ""}
+            </div>
+          </div>
+
+          <div class="actions">
+            <span class="grip" title="${sortSel.value === "manual" ? "Drag to reorder" : "Switch sort to Manual to reorder"}">⋮⋮</span>
+            <button class="small ghost" data-select="${escapeHtml(t.id)}">${t.selected ? "Unselect" : "Select"}</button>
+            <button class="small ghost" data-edit="${escapeHtml(t.id)}">Edit</button>
+            <button class="small danger" data-del="${escapeHtml(t.id)}">Delete</button>
+          </div>
+        `;
+
+        // Drag reorder
+        if (sortSel.value === "manual") {
+          row.addEventListener("dragstart", (e) => {
+            dragId = t.id;
+            row.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+          });
+          row.addEventListener("dragend", () => {
+            dragId = null;
+            row.classList.remove("dragging");
+          });
+          row.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+          });
+          row.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const targetId = row.dataset.id;
+            if (!dragId || dragId === targetId) return;
+            reorder(dragId, targetId);
+            saveTodos();
+            render();
+          });
+        }
+
+        listEl.appendChild(row);
+      }
+
+      // Hook events
+      listEl.querySelectorAll("[data-toggle]").forEach(el => {
+        el.addEventListener("change", () => toggle(el.getAttribute("data-toggle")));
+      });
+      listEl.querySelectorAll("[data-del]").forEach(el => {
+        el.addEventListener("click", () => del(el.getAttribute("data-del")));
+      });
+      listEl.querySelectorAll("[data-edit]").forEach(el => {
+        el.addEventListener("click", () => openModal(el.getAttribute("data-edit")));
+      });
+      listEl.querySelectorAll("[data-select]").forEach(el => {
+        el.addEventListener("click", () => toggleSelect(el.getAttribute("data-select")));
+      });
+      listEl.querySelectorAll("[data-preview]").forEach(el => {
+        el.addEventListener("click", () => setPreview(el.getAttribute("data-preview")));
+      });
+
+      updateStats();
+      renderTagChips();
+
+      // Keep preview consistent after filtering/searching
+      if (previewId && !todos.some(t => t.id === previewId)) previewId = null;
+      renderPreview();
+    }
+
+    function updateStats(){
+      const total = todos.length;
+      const done = todos.filter(t => t.done).length;
+      const active = total - done;
+      const today = todos.filter(t => !t.done && isToday(t)).length;
+      const overdue = todos.filter(t => !t.done && isOverdue(t)).length;
+      const selected = todos.filter(t => t.selected).length;
+
+      statsEl.innerHTML = `
+        <span class="chip">Total: <b>${total}</b></span>
+        <span class="chip">Active: <b>${active}</b></span>
+        <span class="chip">Done: <b>${done}</b></span>
+        <span class="chip">Today: <b>${today}</b></span>
+        <span class="chip">Overdue: <b>${overdue}</b></span>
+        <span class="chip">Selected: <b>${selected}</b></span>
+        ${activeTag ? `<span class="chip">Tag filter: <b>#${escapeHtml(activeTag)}</b> <button class="small ghost" id="clearTagBtn" style="margin-left:8px;">Clear tag</button></span>` : ``}
+      `;
+
+      const clearTagBtn = document.getElementById("clearTagBtn");
+      if (clearTagBtn) clearTagBtn.addEventListener("click", () => { activeTag = null; render(); });
+    }
+
+    function renderTagChips(){
+      const counts = new Map();
+      for (const t of todos) for (const tag of (t.tags || [])) counts.set(tag, (counts.get(tag) || 0) + 1);
+      const tags = [...counts.entries()].sort((a,b) => b[1]-a[1]).slice(0, 12);
+
+      tagChipsEl.innerHTML = tags.length
+        ? tags.map(([tag,count]) =>
+          `<span class="chip" style="cursor:pointer" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)} <b>${count}</b></span>`
+        ).join("")
+        : `<span class="chip">No tags yet</span>`;
+
+      tagChipsEl.querySelectorAll("[data-tag]").forEach(el => {
+        el.addEventListener("click", () => {
+          activeTag = el.getAttribute("data-tag");
+          toastMsg(`Filtering by #${activeTag}`);
+          render();
+        });
+      });
+    }
+
+    // ---------- Preview panel ----------
+    function setPreview(id){
+      previewId = id;
+      renderPreview();
+    }
+
+    function renderPreview(){
+      const t = previewId ? todos.find(x => x.id === previewId) : null;
+      if (!t) {
+        pvStatus.textContent = "No task selected";
+        pvTitle.textContent = "—";
+        pvMeta.textContent = "—";
+        pvNotes.textContent = "—";
+        return;
+      }
+
+      pvStatus.textContent = t.done ? "Completed" : "Active";
+      pvTitle.textContent = t.title;
+
+      const metaParts = [];
+      metaParts.push(`Priority: ${t.priority}`);
+      if (t.dueDate) metaParts.push(`Due: ${t.dueDate}`);
+      if (t.tags?.length) metaParts.push(`Tags: #${t.tags.join(" #")}`);
+      metaParts.push(`Created: ${fmtDateTime(t.createdAt)}`);
+      pvMeta.textContent = metaParts.join(" • ");
+
+      pvNotes.textContent = t.notes ? t.notes : "(No notes yet. Click Edit to add notes.)";
+    }
+
+    // ---------- Actions ----------
+    function addTodo(){
+      const title = taskInput.value.trim();
+      if (!title) return toastMsg("Type a task first.");
+      const dueDate = dueInput.value || null;
+      const priority = prioritySel.value;
+      const tags = normTags(tagsInput.value);
+
+      const task = {
+        id: rid(),
+        title,
+        done:false,
+        priority,
+        dueDate,
+        tags,
+        notes:"",
+        createdAt: Date.now(),
+        selected:false
+      };
+      todos.unshift(task);
+
+      taskInput.value = "";
+      dueInput.value = "";
+      tagsInput.value = "";
+
+      saveTodos();
+      previewId = task.id; // auto-preview new task
+      render();
+      toastMsg("Task added");
+    }
+
+    function toggle(id){
+      const t = todos.find(x => x.id === id);
+      if (!t) return;
+      t.done = !t.done;
+      if (t.done) t.selected = false;
+      saveTodos();
+      render();
+    }
+
+    function del(id){
+      if (previewId === id) previewId = null;
+      todos = todos.filter(x => x.id !== id);
+      saveTodos();
+      render();
+      toastMsg("Deleted");
+    }
+
+    function toggleSelect(id){
+      const t = todos.find(x => x.id === id);
+      if (!t) return;
+      t.selected = !t.selected;
+      saveTodos();
+      render();
+    }
+
+    function reorder(fromId, toId){
+      const fromIdx = todos.findIndex(t => t.id === fromId);
+      const toIdx = todos.findIndex(t => t.id === toId);
+      if (fromIdx === -1 || toIdx === -1) return;
+      const [item] = todos.splice(fromIdx, 1);
+      todos.splice(toIdx, 0, item);
+    }
+
+    // Bulk actions
+    function selectVisible(){
+      for (const v of visibleTodos()) {
+        const real = todos.find(x => x.id === v.id);
+        if (real && !real.done) real.selected = true;
+      }
+      saveTodos();
+      render();
+      toastMsg("Selected visible tasks");
+    }
+
+    function markSelectedDone(){
+      let n = 0;
+      for (const t of todos) {
+        if (t.selected && !t.done) { t.done = true; t.selected = false; n++; }
+      }
+      saveTodos();
+      render();
+      toastMsg(`Marked done: ${n}`);
+    }
+
+    function deleteSelected(){
+      const n = todos.filter(t => t.selected).length;
+      if (n === 0) return toastMsg("No selected tasks.");
+      if (!confirm(`Delete ${n} selected task(s)?`)) return;
+      const ids = new Set(todos.filter(t => t.selected).map(t => t.id));
+      if (previewId && ids.has(previewId)) previewId = null;
+      todos = todos.filter(t => !t.selected);
+      saveTodos();
+      render();
+      toastMsg("Deleted selected");
+    }
+
+    // ---------- Modal (edit) ----------
+    function openModal(id){
+      const t = todos.find(x => x.id === id);
+      if (!t) return;
+      editingId = id;
+
+      modalTaskTitle.value = t.title;
+      modalDue.value = t.dueDate || "";
+      modalPriority.value = t.priority;
+      modalTags.value = (t.tags || []).join(", ");
+      modalNotes.value = t.notes || "";
+
+      modalBack.style.display = "flex";
+      modalTaskTitle.focus();
+    }
+
+    function closeModal(){
+      editingId = null;
+      modalBack.style.display = "none";
+    }
+
+    function saveModal(){
+      if (!editingId) return closeModal();
+      const t = todos.find(x => x.id === editingId);
+      if (!t) return closeModal();
+
+      const title = modalTaskTitle.value.trim();
+      if (!title) return toastMsg("Title cannot be empty.");
+
+      t.title = title;
+      t.dueDate = modalDue.value || null;
+      t.priority = modalPriority.value;
+      t.tags = normTags(modalTags.value);
+      t.notes = (modalNotes.value || "").trim();
+
+      saveTodos();
+      previewId = t.id;
+      closeModal();
+      render();
+      toastMsg("Saved");
+    }
+
+    modalClose.addEventListener("click", closeModal);
+    modalCancel.addEventListener("click", closeModal);
+    modalBack.addEventListener("click", (e) => { if (e.target === modalBack) closeModal(); });
+    modalSave.addEventListener("click", saveModal);
+
+    // ---------- Export / Import / Reset ----------
+    exportBtn.addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify({ version: 1, todos }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "todo-pro-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      toastMsg("Exported");
+    });
+
+    importBtn.addEventListener("click", () => importFile.click());
+
+    importFile.addEventListener("change", async () => {
+      const file = importFile.files?.[0];
+      importFile.value = "";
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const arr = Array.isArray(data) ? data : data?.todos;
+        if (!Array.isArray(arr)) throw new Error("Invalid JSON format.");
+
+        todos = arr.map(x => ({
+          id: x.id || rid(),
+          title: String(x.title ?? "Untitled"),
+          done: !!x.done,
+          priority: (x.priority === "high" || x.priority === "low" || x.priority === "normal") ? x.priority : "normal",
+          dueDate: (typeof x.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x.dueDate)) ? x.dueDate : null,
+          tags: Array.isArray(x.tags) ? x.tags.map(t => String(t).toLowerCase()).filter(Boolean) : [],
+          notes: String(x.notes ?? ""),
+          createdAt: (typeof x.createdAt === "number") ? x.createdAt : Date.now(),
+          selected: false
+        }));
+
+        previewId = null;
+        activeTag = null;
+        saveTodos();
+        render();
+        toastMsg("Imported");
+      } catch (e) {
+        alert(e.message || "Import failed.");
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      if (!confirm("Reset: delete ALL tasks?")) return;
+      todos = [];
+      previewId = null;
+      activeTag = null;
+      saveTodos();
+      render();
+      toastMsg("Reset done");
+    });
+
+    // ---------- UI events ----------
+    addBtn.addEventListener("click", addTodo);
+    taskInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+
+    searchInput.addEventListener("input", render);
+    filterSel.addEventListener("change", render);
+    sortSel.addEventListener("change", render);
+
+    clearDoneBtn.addEventListener("click", () => {
+      const before = todos.length;
+      todos = todos.filter(t => !t.done);
+      if (previewId && !todos.some(t => t.id === previewId)) previewId = null;
+      saveTodos();
+      render();
+      toastMsg(`Cleared ${before - todos.length} completed`);
+    });
+
+    selectAllBtn.addEventListener("click", selectVisible);
+    markDoneBtn.addEventListener("click", markSelectedDone);
+    deleteSelectedBtn.addEventListener("click", deleteSelected);
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if*
